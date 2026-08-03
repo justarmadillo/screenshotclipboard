@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Screenshot Clipboard</string>
+    <string name="monitoring">Monitoring</string>
+    <string name="status_running">Service running — new screenshots are copied to the clipboard</string>
+    <string name="status_stopped">Service stopped</string>
+    <string name="watched_folder">Watched folder</string>
+    <string name="change_folder">Change folder…</string>
+    <string name="after_copy">After copying</string>
+    <string name="keep_file">Keep the file</string>
+    <string name="delete_after">Delete after delay</string>
+    <string name="delay_seconds">Delay (seconds)</string>
+    <string name="permissions">Permissions</string>
+    <string name="all_files_access">All files access</string>
+    <string name="notifications">Notifications</string>
+    <string name="grant">Grant</string>
+    <string name="granted">Granted</string>
+    <string name="test_copy">Test clipboard copy (diagnostics)</string>
+    <string name="unsupported_folder">Only internal storage folders are supported</string>
+    <string name="oem_hint">Tip: some manufacturers (Xiaomi, Samsung, etc.) block auto-start after reboot. If monitoring does not resume after a reboot, enable auto-start for this app in system settings.</string>
+    <string name="notif_channel">Screenshot monitor</string>
+    <string name="notif_channel_desc">Foreground service status for screenshot monitoring</string>
+    <string name="notif_title">Screenshot Clipboard</string>
+    <string name="notif_running">Monitoring screenshots</string>
+    <string name="copied">Copied %1$s to clipboard</string>
+    <string name="deleted">Deleted %1$s</string>
+    <string name="delete_failed">Failed to delete %1$s</string>
+    <string name="err_folder_missing">Folder not found: %1$s — waiting for it to appear…</string>
+    <string name="err_watch_failed">Could not watch folder: %1$s — retrying…</string>
+    <string name="err_copy_failed">Clipboard copy failed: %1$s</string>
+</resources>
