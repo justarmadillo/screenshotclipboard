@@ -8,6 +8,8 @@ import com.douhi.screehshotcopy.data.PendingRepository
 import com.douhi.screehshotcopy.notify.Notifications
 import com.douhi.screehshotcopy.util.StatusBus
 import java.io.File
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /**
  * The single place where a pending screenshot is resolved, whichever component asks for it —
@@ -27,12 +29,17 @@ class ScreenshotJanitor(
      * monitoring is switched off: the user just told the app to stop managing screenshots, so
      * deleting them at that moment would be the opposite of what was asked.
      */
-    suspend fun cancelAllPending() {
+    suspend fun cancelAllPending() = withContext(NonCancellable) {
         pendingRepository.takeAll().forEach { Notifications.cancel(context, it.notifId) }
     }
 
-    /** User pressed Keep: stop tracking the file and leave it on disk. */
-    suspend fun keep(path: String, notifId: Int) {
+    /**
+     * User pressed Keep: stop tracking the file and leave it on disk.
+     *
+     * NonCancellable, like [deleteNow]: removing the entry is the claim, and being cancelled
+     * between the claim and acting on it would leave the screenshot untracked.
+     */
+    suspend fun keep(path: String, notifId: Int) = withContext(NonCancellable) {
         val claimed = pendingRepository.remove(path) != null
         val name = File(path).name
         Notifications.cancel(context, notifId)
@@ -40,17 +47,17 @@ class ScreenshotJanitor(
             // The deadline already fired and the file is gone; say so instead of lying.
             Log.i(TAG, "Keep arrived too late for $path")
             announce(notifId, context.getString(R.string.keep_too_late, name))
-            return
+            return@withContext
         }
         announce(notifId, context.getString(R.string.kept, name))
     }
 
     /** User pressed Delete now: skip the remaining wait. */
-    suspend fun deleteNow(path: String, notifId: Int) {
+    suspend fun deleteNow(path: String, notifId: Int) = withContext(NonCancellable) {
         val entry = pendingRepository.remove(path)
         if (entry == null) {
             Notifications.cancel(context, notifId)
-            return
+            return@withContext
         }
         finalize(entry)
     }

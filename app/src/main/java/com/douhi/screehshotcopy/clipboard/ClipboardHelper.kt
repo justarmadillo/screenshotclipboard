@@ -9,6 +9,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.core.content.FileProvider
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -88,6 +89,8 @@ class ClipboardHelper(private val context: Context) {
                 if (!bitmap.isRecycled) bitmap.recycle()
                 runCatching { testFile.delete() }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "test copy failed", e)
             CopyResult(false, "exception: ${e.message}")
@@ -125,6 +128,8 @@ class ClipboardHelper(private val context: Context) {
             val uri = FileProvider.getUriForFile(context, context.packageName + FILE_PROVIDER_SUFFIX, copy)
             Result.success(uri to mime)
         }
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
         Log.w(TAG, "Staging ${file.name} failed", e)
         Result.failure(e)

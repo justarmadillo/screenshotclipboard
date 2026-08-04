@@ -7,6 +7,7 @@ import android.content.Intent
 import android.util.Log
 import com.douhi.screehshotcopy.App
 import com.douhi.screehshotcopy.data.PendingDeletion
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
@@ -34,6 +35,8 @@ class DecisionReceiver : BroadcastReceiver() {
                     ACTION_KEEP -> app.container.janitor.keep(path, notifId)
                     ACTION_DELETE_NOW -> app.container.janitor.deleteNow(path, notifId)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to handle $action for $path", e)
             } finally {

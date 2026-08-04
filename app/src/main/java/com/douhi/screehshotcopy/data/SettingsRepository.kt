@@ -3,6 +3,7 @@ package com.douhi.screehshotcopy.data
 import android.os.Environment
 import android.util.Log
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -10,6 +11,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -46,9 +48,11 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setKeepTimeoutMs(ms: Long) = editSafely { it[KEY_TIMEOUT] = AppSettings.sanitizeTimeout(ms) }
 
-    private suspend fun editSafely(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
+    private suspend fun editSafely(block: (MutablePreferences) -> Unit) {
         try {
             dataStore.edit(block)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "Settings write failed", e)
         }

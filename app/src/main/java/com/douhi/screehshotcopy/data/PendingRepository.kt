@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -111,6 +112,10 @@ class PendingRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun peek(): List<PendingDeletion> = try {
         pending.first()
+    } catch (e: CancellationException) {
+        // Never swallowed: a cancelled edit may already have mutated the queue, and reporting
+        // "nothing happened" would strand whatever it claimed.
+        throw e
     } catch (e: Exception) {
         Log.w(TAG, "Pending peek failed", e)
         emptyList()
@@ -135,6 +140,10 @@ class PendingRepository(private val dataStore: DataStore<Preferences>) {
             holder[0] = entry
         }
         holder[0]
+    } catch (e: CancellationException) {
+        // Never swallowed: a cancelled edit may already have mutated the queue, and reporting
+        // "nothing happened" would strand whatever it claimed.
+        throw e
     } catch (e: Exception) {
         Log.w(TAG, "Pending add failed for $path", e)
         null
@@ -152,6 +161,10 @@ class PendingRepository(private val dataStore: DataStore<Preferences>) {
             }
         }
         holder[0]
+    } catch (e: CancellationException) {
+        // Never swallowed: a cancelled edit may already have mutated the queue, and reporting
+        // "nothing happened" would strand whatever it claimed.
+        throw e
     } catch (e: Exception) {
         Log.w(TAG, "Pending remove failed for $path", e)
         null
@@ -167,6 +180,10 @@ class PendingRepository(private val dataStore: DataStore<Preferences>) {
             holder[0] = due
         }
         holder[0] ?: emptyList()
+    } catch (e: CancellationException) {
+        // Never swallowed: a cancelled edit may already have mutated the queue, and reporting
+        // "nothing happened" would strand whatever it claimed.
+        throw e
     } catch (e: Exception) {
         Log.w(TAG, "Pending takeDue failed", e)
         emptyList()
@@ -181,6 +198,10 @@ class PendingRepository(private val dataStore: DataStore<Preferences>) {
             holder[0] = entries
         }
         holder[0] ?: emptyList()
+    } catch (e: CancellationException) {
+        // Never swallowed: a cancelled edit may already have mutated the queue, and reporting
+        // "nothing happened" would strand whatever it claimed.
+        throw e
     } catch (e: Exception) {
         Log.w(TAG, "Pending takeAll failed", e)
         emptyList()

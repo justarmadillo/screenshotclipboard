@@ -23,15 +23,18 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Foreground service that watches the screenshot folder, puts every new screenshot on the
@@ -79,6 +82,9 @@ class MonitorService : Service() {
 
     /** Paths already handled, so the two independent detectors never double-process a file. */
     private val recentlyHandled = LinkedHashMap<String, Long>()
+
+    /** Wakes the deadline sweeper when the queue changes. Conflated: only "something changed" matters. */
+    private val queueChanged = Channel<Unit>(Channel.CONFLATED)
 
     override fun onCreate() {
         super.onCreate()
@@ -434,37 +440,54 @@ class MonitorService : Service() {
      * Deletes screenshots whose deadline has passed.
      *
      * The queue is the source of truth and lives in DataStore, so this survives the process being
-     * killed: on the next start the first emission already contains the overdue entries.
-     * [collectLatest] restarts the wait whenever the queue changes, which is what makes a Keep tap
-     * take effect immediately instead of at the next poll.
+     * killed: on the next start the queue still holds the overdue entries.
+     *
+     * Split into a watcher and a worker on purpose. Draining the queue writes to it, and an
+     * earlier version ran the drain inside `collectLatest` on that same flow — so the write
+     * cancelled the coroutine that was about to do the deleting, after the entries had already
+     * been claimed. The watcher here only ever pokes the worker, so a queue change can never
+     * cancel a delete that is already under way.
      */
     private fun observePending() {
-        sweepJob = scope.launch {
-            container.pendingRepository.pending.collectLatest { snapshot ->
-                var current = snapshot
-                // currentCoroutineContext(), not the enclosing scope's isActive: collectLatest
-                // cancels *this* block on every queue change, and that is the signal to stop.
-                while (currentCoroutineContext().isActive) {
-                    StatusBus.update { it.copy(pendingCount = current.size) }
-                    if (current.isEmpty()) return@collectLatest
-                    val wait = current.minOf { it.deadlineMs } - System.currentTimeMillis()
-                    if (wait > 0) {
-                        delay(wait.coerceAtMost(MAX_SLEEP_MS))
-                        current = container.pendingRepository.peek()
-                        continue
-                    }
-                    val due = container.pendingRepository.takeDue(
-                        System.currentTimeMillis(),
-                        AppSettings.MAX_TIMEOUT_MS,
-                    )
-                    due.forEach { container.janitor.finalize(it) }
-                    // Nothing was claimed: another component got there first. Back off so this can
-                    // never become a hot loop.
-                    if (due.isEmpty()) delay(IDLE_TICK_MS)
-                    current = container.pendingRepository.peek()
-                }
+        scope.launch {
+            container.pendingRepository.pending.collect { entries ->
+                StatusBus.update { it.copy(pendingCount = entries.size) }
+                queueChanged.trySend(Unit)
             }
         }
+        sweepJob = scope.launch {
+            while (isActive) {
+                val entries = container.pendingRepository.peek()
+                val wait = if (entries.isEmpty()) {
+                    MAX_SLEEP_MS
+                } else {
+                    (entries.minOf { it.deadlineMs } - System.currentTimeMillis())
+                        .coerceIn(0L, MAX_SLEEP_MS)
+                }
+                // Wakes early when the queue changes, so a Keep tap or a new screenshot takes
+                // effect immediately rather than at the next tick.
+                if (wait > 0) withTimeoutOrNull(wait) { queueChanged.receive() }
+                val swept = sweepDue()
+                // Guard against a hot loop if a deadline has passed but something else claimed it.
+                if (wait <= 0L && swept == 0) delay(IDLE_TICK_MS)
+            }
+        }
+    }
+
+    /**
+     * Claims every due entry and deletes it. Returns how many were handled.
+     *
+     * NonCancellable because [PendingRepository.takeDue] removes the entries from the durable
+     * queue: cancelling between the claim and the delete would leave the screenshot orphaned —
+     * off the queue and still on disk, with nothing left to retry it.
+     */
+    private suspend fun sweepDue(): Int = withContext(NonCancellable) {
+        val due = container.pendingRepository.takeDue(
+            System.currentTimeMillis(),
+            AppSettings.MAX_TIMEOUT_MS,
+        )
+        due.forEach { container.janitor.finalize(it) }
+        due.size
     }
 
     // endregion
