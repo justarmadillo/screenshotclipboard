@@ -2,30 +2,54 @@
 <resources>
     <string name="app_name">Screenshot Clipboard</string>
     <string name="monitoring">Monitoring</string>
-    <string name="status_running">Service running — new screenshots are copied to the clipboard</string>
+    <string name="status_running">Service running — new screenshots go to the clipboard, then you choose whether to keep the file</string>
     <string name="status_stopped">Service stopped</string>
+    <plurals name="pending_count">
+        <item quantity="one">%1$d screenshot awaiting your decision</item>
+        <item quantity="other">%1$d screenshots awaiting your decision</item>
+    </plurals>
     <string name="watched_folder">Watched folder</string>
     <string name="change_folder">Change folder…</string>
-    <string name="after_copy">After copying</string>
-    <string name="keep_file">Keep the file</string>
-    <string name="delete_after">Delete after delay</string>
-    <string name="delay_seconds">Delay (seconds)</string>
+
+    <string name="decision_window">Decision window</string>
+    <string name="decision_window_desc">After each screenshot a notification asks whether to keep the file. Tap Keep and it stays. Do nothing and it is deleted when the countdown ends — the clipboard copy is unaffected either way.</string>
+    <string name="timeout_seconds">Seconds before deleting</string>
+    <string name="timeout_range">Allowed range: %1$d–%2$d seconds</string>
+
     <string name="permissions">Permissions</string>
     <string name="all_files_access">All files access</string>
     <string name="notifications">Notifications</string>
     <string name="grant">Grant</string>
     <string name="granted">Granted</string>
+    <string name="warn_no_notifications">Notifications are blocked, so the keep prompt cannot be shown and screenshots will be deleted without asking. Grant notification access to be able to keep files.</string>
     <string name="test_copy">Test clipboard copy (diagnostics)</string>
-    <string name="unsupported_folder">Only internal storage folders are supported</string>
+    <string name="unsupported_folder">Pick a folder on internal storage — SD cards and cloud folders are not supported</string>
+    <string name="no_picker">No folder picker available on this device</string>
+    <string name="grant_manually">Open Settings › Apps › Screenshot Clipboard and allow access to all files</string>
     <string name="oem_hint">Tip: some manufacturers (Xiaomi, Samsung, etc.) block auto-start after reboot. If monitoring does not resume after a reboot, enable auto-start for this app in system settings.</string>
+
     <string name="notif_channel">Screenshot monitor</string>
     <string name="notif_channel_desc">Foreground service status for screenshot monitoring</string>
+    <string name="notif_channel_prompt">Keep or delete</string>
+    <string name="notif_channel_prompt_desc">Asks whether to keep each screenshot after it is copied</string>
     <string name="notif_title">Screenshot Clipboard</string>
     <string name="notif_running">Monitoring screenshots</string>
+
+    <string name="prompt_title">Copied to clipboard</string>
+    <string name="prompt_text">%1$s — deleting soon</string>
+    <string name="prompt_text_long">%1$s is on the clipboard. It will be deleted when the countdown ends. Tap Keep to save the file.</string>
+    <string name="action_keep">Keep</string>
+    <string name="action_delete_now">Delete now</string>
+
     <string name="copied">Copied %1$s to clipboard</string>
+    <string name="copied_kept_unsafe">Copied %1$s — kept the file (could not schedule deletion)</string>
+    <string name="kept">Kept %1$s</string>
+    <string name="keep_too_late">%1$s was already deleted</string>
     <string name="deleted">Deleted %1$s</string>
     <string name="delete_failed">Failed to delete %1$s</string>
+
     <string name="err_folder_missing">Folder not found: %1$s — waiting for it to appear…</string>
     <string name="err_watch_failed">Could not watch folder: %1$s — retrying…</string>
     <string name="err_copy_failed">Clipboard copy failed: %1$s</string>
+    <string name="err_service_blocked">Android refused to start the monitoring service. Open the app again, or disable battery restrictions for it.</string>
 </resources>

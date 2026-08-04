@@ -1,6 +1,7 @@
 package com.douhi.screehshotcopy.data
 
 import android.os.Environment
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -9,59 +10,72 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import java.io.File
-import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
+    /** Probing the filesystem is only worth doing once per process. */
+    private val detectedFolder: String by lazy { detectDefaultFolder() }
+
     val settings: Flow<AppSettings> = dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .catch { e ->
+            // Never let a corrupt/unreadable store kill the collector: fall back to defaults.
+            Log.w(TAG, "Settings read failed, using defaults", e)
+            emit(emptyPreferences())
+        }
         .map { prefs ->
-            val folderPath = prefs[KEY_FOLDER]
             AppSettings(
                 enabled = prefs[KEY_ENABLED] ?: false,
-                folderPath = folderPath ?: detectDefaultFolder(),
-                deleteBehavior = if (prefs[KEY_DELETE] == true) DeleteBehavior.DELETE else DeleteBehavior.KEEP,
-                deleteDelayMs = prefs[KEY_DELAY] ?: AppSettings.DEFAULT_DELAY_MS,
+                folderPath = prefs[KEY_FOLDER]?.let { AppSettings.sanitizeFolder(it) } ?: detectedFolder,
+                keepTimeoutMs = AppSettings.sanitizeTimeout(
+                    prefs[KEY_TIMEOUT] ?: AppSettings.DEFAULT_TIMEOUT_MS
+                ),
             )
         }
+        .distinctUntilChanged()
 
-    suspend fun setEnabled(value: Boolean) {
-        dataStore.edit { it[KEY_ENABLED] = value }
+    suspend fun current(): AppSettings = settings.first()
+
+    suspend fun setEnabled(value: Boolean) = editSafely { it[KEY_ENABLED] = value }
+
+    suspend fun setFolder(path: String) = editSafely { it[KEY_FOLDER] = AppSettings.sanitizeFolder(path) }
+
+    suspend fun setKeepTimeoutMs(ms: Long) = editSafely { it[KEY_TIMEOUT] = AppSettings.sanitizeTimeout(ms) }
+
+    private suspend fun editSafely(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
+        try {
+            dataStore.edit(block)
+        } catch (e: Exception) {
+            Log.w(TAG, "Settings write failed", e)
+        }
     }
 
-    suspend fun setFolder(path: String) {
-        dataStore.edit { it[KEY_FOLDER] = path }
+    private fun detectDefaultFolder(): String = try {
+        val root = Environment.getExternalStorageDirectory()
+        FOLDER_CANDIDATES.firstOrNull { File(root, it).isDirectory } ?: AppSettings.DEFAULT_FOLDER
+    } catch (e: Exception) {
+        Log.w(TAG, "Folder detection failed", e)
+        AppSettings.DEFAULT_FOLDER
     }
 
-    suspend fun setDeleteBehavior(behavior: DeleteBehavior) {
-        dataStore.edit { it[KEY_DELETE] = behavior == DeleteBehavior.DELETE }
-    }
+    private companion object {
+        const val TAG = "SettingsRepository"
+        val KEY_ENABLED = booleanPreferencesKey("enabled")
+        val KEY_FOLDER = stringPreferencesKey("folder")
 
-    suspend fun setDeleteDelayMs(ms: Long) {
-        dataStore.edit { it[KEY_DELAY] = ms }
-    }
+        /** Reused from v1.x, where it stored the "delete after" delay. Same meaning, new name. */
+        val KEY_TIMEOUT = longPreferencesKey("delay")
 
-    private fun detectDefaultFolder(): String {
-        val candidates = listOf(
+        val FOLDER_CANDIDATES = listOf(
             "Pictures/Screenshots",
             "DCIM/Screenshots",
             "Pictures/Screenshot",
             "DCIM/Screenshot",
+            "Pictures/ScreenCapture",
         )
-        val root = Environment.getExternalStorageDirectory()
-        return candidates.firstOrNull { candidate ->
-            val dir = File(root, candidate)
-            dir.isDirectory || dir.exists()
-        } ?: AppSettings.DEFAULT_FOLDER
-    }
-
-    private companion object {
-        val KEY_ENABLED = booleanPreferencesKey("enabled")
-        val KEY_FOLDER = stringPreferencesKey("folder")
-        val KEY_DELETE = booleanPreferencesKey("delete")
-        val KEY_DELAY = longPreferencesKey("delay")
     }
 }

@@ -9,8 +9,15 @@ data class MonitorStatus(
     val folder: String = "",
     val lastAction: String? = null,
     val error: String? = null,
+    val pendingCount: Int = 0,
+    val notificationsBlocked: Boolean = false,
 )
 
+/**
+ * Process-wide status shared between the service and the UI. Deliberately not persisted: it
+ * describes what is happening right now, and a stale "last action" from a previous boot would be
+ * misleading rather than useful.
+ */
 object StatusBus {
     private val _status = MutableStateFlow(MonitorStatus())
     val status: StateFlow<MonitorStatus> = _status

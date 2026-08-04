@@ -14,8 +14,8 @@ android {
         applicationId = "com.douhi.screehshotcopy"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "2.0"
     }
 
     signingConfigs {
@@ -30,6 +30,12 @@ android {
                 keyAlias = props.getProperty("keyAlias")
                 keyPassword = props.getProperty("keyPassword")
             }
+            // Pinned rather than left to the AGP defaults, so rebuilding this years from now with
+            // a newer AGP produces an APK that installs on the same devices.
+            // v1 is unnecessary below minSdk 26; v2 and v3 cover Android 7+ and 9+ respectively.
+            enableV1Signing = false
+            enableV2Signing = true
+            enableV3Signing = true
         }
     }
 
@@ -67,4 +73,5 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.datastore.preferences)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    testImplementation(libs.junit)
 }

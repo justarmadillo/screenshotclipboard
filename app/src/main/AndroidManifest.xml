@@ -9,12 +9,19 @@
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
+    <!--
+        No READ_MEDIA_IMAGES on purpose. MANAGE_EXTERNAL_STORAGE, which this app hard-requires,
+        already grants full MediaStore reads. Asking for it as well would only add Android 14's
+        partial "Select photos" grant, which returns a filtered view of the media database — worse
+        for the secondary detector than not asking at all.
+    -->
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- Pre-Q, deleting a file in shared storage requires the write permission. -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29" />
+        android:maxSdkVersion="28" />
 
     <application
         android:name=".App"
@@ -29,7 +36,8 @@
 
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -42,8 +50,14 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Monitors the screenshot folder, copies new screenshots to the clipboard and optionally deletes them" />
+                android:value="Monitors the screenshot folder, copies new screenshots to the clipboard and deletes them unless the user chooses to keep them" />
         </service>
+
+        <!-- Keep / Delete now buttons on the prompt notification. Internal only. -->
+        <receiver
+            android:name=".service.DecisionReceiver"
+            android:enabled="true"
+            android:exported="false" />
 
         <receiver
             android:name=".service.BootReceiver"
@@ -52,6 +66,9 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <!-- Legacy OEM boot broadcasts (HTC, some Xiaomi builds). -->
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 
