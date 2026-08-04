@@ -27,6 +27,13 @@ object Notifications {
 
     const val SERVICE_ID = 1
 
+    /**
+     * Every short-lived result (copied / kept / deleted / failed) shares one id, so they replace
+     * each other instead of stacking up in the shade. Safe against the prompt ids, which start at
+     * [com.douhi.screehshotcopy.data.PendingRepository] NOTIF_ID_BASE (1000).
+     */
+    const val TRANSIENT_ID = 2
+
     private const val TAG = "Notifications"
     private const val CHANNEL_SERVICE = "monitor"
 
@@ -68,12 +75,16 @@ object Notifications {
         }
     }
 
-    fun buildServiceNotification(context: Context, text: String): Notification =
+    /**
+     * The ongoing foreground notification. Its text is deliberately fixed: it states what the
+     * service *is*, not what it last did. Per-screenshot messages are transient
+     * ([buildResultNotification]) so nothing stale is ever left sitting in the shade.
+     */
+    fun buildServiceNotification(context: Context): Notification =
         NotificationCompat.Builder(context, CHANNEL_SERVICE)
             .setSmallIcon(R.drawable.ic_stat_monitor)
             .setContentTitle(context.getString(R.string.notif_title))
-            .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setContentText(context.getString(R.string.notif_running))
             .setContentIntent(openAppIntent(context))
             .setOngoing(true)
             .setSilent(true)
@@ -129,8 +140,9 @@ object Notifications {
     }
 
     /**
-     * Short-lived confirmation that replaces the prompt once a decision has been made. Posted on
-     * the low-importance channel: the user has just acted, so this is feedback, not an interruption.
+     * Short-lived confirmation of what just happened to a screenshot. Posted on the low-importance
+     * channel and always with a timeout: this is feedback, not an interruption, and it must clear
+     * itself even if the app is killed before it can cancel it. Always posted with [TRANSIENT_ID].
      */
     fun buildResultNotification(context: Context, text: String): Notification =
         NotificationCompat.Builder(context, CHANNEL_SERVICE)

@@ -33,7 +33,7 @@
     <string name="notif_channel_prompt">Keep or delete</string>
     <string name="notif_channel_prompt_desc">Asks whether to keep each screenshot after it is copied</string>
     <string name="notif_title">Screenshot Clipboard</string>
-    <string name="notif_running">Monitoring screenshots</string>
+    <string name="notif_running">Monitoring…</string>
 
     <string name="prompt_title">Copied to clipboard</string>
     <string name="prompt_text">%1$s — deleting soon</string>

@@ -98,7 +98,7 @@ class MonitorService : Service() {
         // Must happen on every single start command, not just the first: the system gives a
         // service started with startForegroundService a few seconds to post its notification, and
         // skipping it on a redelivery is an instant ANR-and-kill.
-        if (!promoteToForeground(getString(R.string.notif_running))) {
+        if (!promoteToForeground()) {
             stopSelfResult(startId)
             return START_NOT_STICKY
         }
@@ -131,8 +131,8 @@ class MonitorService : Service() {
 
     // region lifecycle helpers
 
-    private fun promoteToForeground(text: String): Boolean = try {
-        val notification = Notifications.buildServiceNotification(this, text)
+    private fun promoteToForeground(): Boolean = try {
+        val notification = Notifications.buildServiceNotification(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(Notifications.SERVICE_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
@@ -145,8 +145,13 @@ class MonitorService : Service() {
         false
     }
 
-    private fun updateServiceNotification(text: String) {
-        Notifications.post(this, Notifications.SERVICE_ID, Notifications.buildServiceNotification(this, text))
+    /**
+     * Per-screenshot feedback. Never touches the ongoing notification: that one always reads
+     * "monitoring" so the shade cannot be left showing a message about a file that was dealt with
+     * minutes ago.
+     */
+    private fun postTransient(text: String) {
+        Notifications.post(this, Notifications.TRANSIENT_ID, Notifications.buildResultNotification(this, text))
     }
 
     /**
@@ -163,6 +168,9 @@ class MonitorService : Service() {
         drainPending(deletePending)
         if (stopSelfResult(stopId)) {
             stopForeground(STOP_FOREGROUND_REMOVE)
+            // The transient clears itself after a few seconds anyway, but leaving it behind after
+            // the service is gone would look like the app is still running.
+            Notifications.cancel(this, Notifications.TRANSIENT_ID)
         } else {
             // A newer start command landed mid-shutdown; that start's own resync re-arms us.
             Log.i(TAG, "Shutdown skipped: a newer start command is pending")
@@ -386,7 +394,7 @@ class MonitorService : Service() {
             release(file.absolutePath)
             val message = getString(R.string.err_copy_failed, file.name) + " — " + result.source
             StatusBus.update { it.copy(error = message) }
-            updateServiceNotification(message)
+            postTransient(message)
             return
         }
 
@@ -399,7 +407,7 @@ class MonitorService : Service() {
             val message = getString(R.string.copied_kept_unsafe, file.name)
             Log.w(TAG, "Could not queue ${file.name} for deletion; keeping it")
             StatusBus.update { it.copy(lastAction = message) }
-            updateServiceNotification(message)
+            postTransient(message)
             return
         }
 
@@ -408,8 +416,9 @@ class MonitorService : Service() {
             entry.notifId,
             Notifications.buildPromptNotification(this, entry, file.name),
         )
+        // No separate "copied" notification: the prompt itself says so, and it clears itself when
+        // the decision is made or the countdown ends.
         StatusBus.update { it.copy(notificationsBlocked = !posted) }
-        updateServiceNotification(getString(R.string.copied, file.name))
     }
 
     /** Returns true if this call is the first to take ownership of [path]. */

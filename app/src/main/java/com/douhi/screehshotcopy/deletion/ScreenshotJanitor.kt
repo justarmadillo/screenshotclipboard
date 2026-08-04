@@ -46,10 +46,10 @@ class ScreenshotJanitor(
         if (!claimed) {
             // The deadline already fired and the file is gone; say so instead of lying.
             Log.i(TAG, "Keep arrived too late for $path")
-            announce(notifId, context.getString(R.string.keep_too_late, name))
+            announce(context.getString(R.string.keep_too_late, name))
             return@withContext
         }
-        announce(notifId, context.getString(R.string.kept, name))
+        announce(context.getString(R.string.kept, name))
     }
 
     /** User pressed Delete now: skip the remaining wait. */
@@ -78,14 +78,21 @@ class ScreenshotJanitor(
         val message =
             if (deleted) context.getString(R.string.deleted, file.name)
             else context.getString(R.string.delete_failed, file.name)
-        announce(entry.notifId, message, alsoNotify = !deleted)
+        announce(message)
     }
 
-    private fun announce(notifId: Int, message: String, alsoNotify: Boolean = true) {
+    /**
+     * Feedback for a resolved screenshot. Always the transient notification, never the ongoing one:
+     * it says its piece and then disappears on its own, so the shade is never left holding a message
+     * about a file that has already been dealt with.
+     */
+    private fun announce(message: String) {
         StatusBus.update { it.copy(lastAction = message) }
-        if (alsoNotify) {
-            Notifications.post(context, notifId, Notifications.buildResultNotification(context, message))
-        }
+        Notifications.post(
+            context,
+            Notifications.TRANSIENT_ID,
+            Notifications.buildResultNotification(context, message),
+        )
     }
 
     private companion object {
